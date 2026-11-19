@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>寶雅線上買快查</title>
+    <title>線上買快查</title>
     <style>
         :root { --poya: #d63384; --bg: #f5f5f5; }
         body { font-family: "微軟正黑體", sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
