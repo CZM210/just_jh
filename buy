@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>寶雅線上買快查</title>
+    <style>
+        :root { --poya: #d63384; --bg: #f5f5f5; }
+        body { font-family: "微軟正黑體", sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 480px; margin: 0 auto; }
+        .search-box { display: flex; gap: 6px; margin-bottom: 10px; }
+        input { flex: 1; padding: 11px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; outline: none; min-width: 0; }
+        button { padding: 0 16px; background: var(--poya); color: #fff; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
+        .status { font-size: 13px; color: #666; text-align: center; margin-bottom: 12px; min-height: 18px; }
+        .card { background: #fff; border-radius: 10px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: none; }
+        .prod-img { width: 100%; max-height: 360px; object-fit: contain; border-radius: 6px; background: #fafafa; margin-bottom: 12px; display: none; }
+        .plain-box { width: 100%; padding: 10px; font-size: 15px; line-height: 1.6; border: 1px solid #ddd; border-radius: 6px; background: #fffde7; box-sizing: border-box; resize: none; font-family: inherit; }
+        .actions { display: flex; gap: 8px; margin-top: 10px; }
+        .btn-copy { flex: 1; padding: 10px; background: #4a69bd; }
+        .btn-link { flex: 1; padding: 10px; background: #eee; color: #333; text-align: center; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="q" placeholder="輸入 8 碼編號或貼上網址" onkeypress="if(event.keyCode===13) queryItem();">
+            <button id="btn-go" onclick="queryItem()">查詢</button>
+        </div>
+        <div id="status" class="status">就緒，請輸入線上買編號</div>
+
+        <div id="card" class="card">
+            <img id="prod-img" class="prod-img" src="" alt="商品圖片">
+            <textarea id="plain-text" class="plain-box" rows="3" readonly></textarea>
+            <div class="actions">
+                <button class="btn-copy" onclick="copyText()">複製純文字</button>
+                <a id="prod-link" class="btn-link" href="#" target="_blank">開啟原網頁</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var ONLINE_GAS_URL = "https://script.google.com/macros/s/AKfycbzyfwXq4g2jXp1smIVcftW8K_F6Ky0mrppCgOFVhstxIzNiUeO2lXligQqdVP8U1yUnNA/exec";
+
+        function queryItem() {
+            var raw = document.getElementById('q').value.trim();
+            var statusEl = document.getElementById('status');
+            var btn = document.getElementById('btn-go');
+            var card = document.getElementById('card');
+
+            var match = raw.match(/\d{7,9}/);
+            if (!match) {
+                statusEl.innerText = "⚠️ 格式不符：請輸入 7~9 位商品編號或網址";
+                return;
+            }
+
+            var id = match[0];
+            btn.disabled = true;
+            card.style.display = "none";
+            statusEl.innerText = "⏳ 正在查詢【" + id + "】...";
+
+            var cbName = "poyaCallback_" + Math.floor(Math.random() * 1000000);
+            var script = document.createElement("script");
+
+            var timer = setTimeout(function() {
+                cleanup();
+                statusEl.innerText = "⚠️ 連線逾時，請稍後再試";
+            }, 10000);
+
+            function cleanup() {
+                clearTimeout(timer);
+                btn.disabled = false;
+                if (script.parentNode) script.parentNode.removeChild(script);
+                delete window[cbName];
+            }
+
+            window[cbName] = function(data) {
+                cleanup();
+                if (data.success && data.title) {
+                    // 1. 拆解品名與價格（相容原本 GAS 的 title 內含 NT$ 格式）
+                    var rawTitle = data.title;
+                    var priceMatch = rawTitle.match(/NT\$\s*([\d,]+)/i);
+                    var price = data.price || (priceMatch ? priceMatch[1] : "");
+                    var cleanTitle = rawTitle.replace(/\s*NT\$\s*[\d,]+/i, '').trim();
+
+                    // 2. 顯示圖片（若原本 GAS 有回傳 image 欄位）
+                    var imgEl = document.getElementById('prod-img');
+                    if (data.image) {
+                        imgEl.src = data.image;
+                        imgEl.style.display = "block";
+                    } else {
+                        imgEl.style.display = "none";
+                    }
+
+                    // 3. 組合純文字與原網頁連結
+                    var textOut = cleanTitle + (price ? ("\nNT$" + price) : "");
+                    document.getElementById('plain-text').value = textOut;
+                    document.getElementById('prod-link').href = "https://www.poyabuy.com.tw/SalePage/Index/" + id;
+
+                    card.style.display = "block";
+                    statusEl.innerText = "✅ 查詢完成";
+                } else {
+                    statusEl.innerText = "❌ " + (data.message || "查無此商品或已下架");
+                }
+            };
+
+            script.onerror = function() {
+                cleanup();
+                statusEl.innerText = "⚠️ 連線失敗，請檢查網路狀態";
+            };
+
+            script.src = ONLINE_GAS_URL + "?id=" + encodeURIComponent(id) + "&callback=" + cbName;
+            document.body.appendChild(script);
+        }
+
+        function copyText() {
+            var txt = document.getElementById('plain-text');
+            txt.select();
+            txt.setSelectionRange(0, 99999);
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(txt.value).then(function() {
+                    document.getElementById('status').innerText = "📋 已複製純文字！";
+                });
+            } else {
+                document.execCommand("copy");
+                document.getElementById('status').innerText = "📋 已複製純文字！";
+            }
+        }
+    </script>
+</body>
+</html>
